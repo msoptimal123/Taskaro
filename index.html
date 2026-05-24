@@ -1,0 +1,276 @@
+# Critical Flows
+
+These are the multi-step workflows that need careful attention. The prototype shows the UI; this document spells out the server-side logic.
+
+---
+
+## 1. Voice capture flow
+
+See `voice-flow.md` for full details. Summary:
+
+```
+Dashboard mic tap
+  → Modal opens
+  → Web Speech / Whisper transcribes
+  → Claude parses → { type, title, date, client_name, ... }
+  → User reviews + edits text if needed
+  → Save → server action
+      ├─ Resolve client (find by name or create new)
+      ├─ Create entity:
+      │   - type=task/deadline → tasks row
+      │   - type=rezervacija → tasks row with start/end_date
+      │   - type=note → notes row
+      └─ Return → modal closes → list refreshes (revalidatePath)
+```
+
+---
+
+## 2. Rezervacija → Project conversion
+
+**Trigger**: User views a `rezervacija` task in calendar or task detail. Clicks "Potrdi termin".
+
+**Server action**:
+```ts
+export async function confirmReservation(taskId: string) {
+  const supabase = createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Fetch the reservation
+  const { data: task } = await supabase
+    .from('tasks').select('*').eq('id', taskId).eq('user_id', user.id).single();
+
+  if (!task || task.type !== 'rezervacija') throw new Error('Not a reservation');
+
+  // Create the project
+  const { data: project } = await supabase
+    .from('projects')
+    .insert({
+      user_id: user.id,
+      client_id: task.client_id,
+      title: task.title.replace(/^rezervacija\s*[-—:]?\s*/i, '') || 'Nov projekt',
+      location: task.location,
+      status: 'active',
+      start_date: task.start_date,
+      end_date: task.end_date,
+      converted_from_task_id: task.id,
+    })
+    .select('id')
+    .single();
+
+  // Convert the reservation into a regular task within the project
+  await supabase
+    .from('tasks')
+    .update({
+      project_id: project!.id,
+      type: 'task',                  // no longer a rezervacija
+      due_date: task.start_date,     // use start_date as due
+      due_time: null,
+      start_date: null,
+      end_date: null,
+    })
+    .eq('id', taskId);
+
+  revalidatePath('/projects');
+  revalidatePath('/calendar');
+  return project!.id;                // navigate to new project
+}
+```
+
+**UX**: After confirmation, redirect user to the new project page so they can immediately add more tasks ("naroci material", "pripelji oder", etc.).
+
+---
+
+## 3. Solo task → Project (manual move)
+
+**Trigger A**: User opens a project, clicks "Premakni iz solo" or similar trigger in the Taski section.
+
+**Server query**: list user's solo tasks (optionally filtered to match project's client):
+```sql
+SELECT * FROM tasks
+WHERE user_id = $1
+  AND project_id IS NULL
+  AND status != 'done'
+  AND ($client_id IS NULL OR client_id = $client_id OR client_id IS NULL);
+```
+
+**UI**: Bottom sheet or new screen showing checkboxes for each solo task.
+
+**Server action**:
+```ts
+export async function moveTasksToProject(taskIds: string[], projectId: string) {
+  const supabase = createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Verify project belongs to user
+  const { data: project } = await supabase
+    .from('projects').select('id, client_id').eq('id', projectId)
+    .eq('user_id', user.id).single();
+  if (!project) throw new Error('Project not found');
+
+  // Bulk update tasks
+  await supabase
+    .from('tasks')
+    .update({
+      project_id: projectId,
+      client_id: project.client_id,       // ensure consistency
+    })
+    .in('id', taskIds)
+    .eq('user_id', user.id)
+    .is('project_id', null);              // only update truly solo ones
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath('/tasks');
+}
+```
+
+**Trigger B**: From task detail in edit mode → "Pripni na projekt" dropdown.
+
+---
+
+## 4. Task completion + reopen
+
+**Complete** (any open task):
+```ts
+export async function completeTask(taskId: string) {
+  const supabase = createServerClient();
+  await supabase
+    .from('tasks')
+    .update({ status: 'done', completed_at: new Date().toISOString() })
+    .eq('id', taskId);
+  // CompletionBurst is client-side, fired on optimistic update
+}
+```
+
+**Reopen** (after confirmation dialog):
+```ts
+export async function reopenTask(taskId: string) {
+  const supabase = createServerClient();
+  await supabase
+    .from('tasks')
+    .update({ status: 'open', completed_at: null })
+    .eq('id', taskId);
+}
+```
+
+**UI pattern**: Optimistic update. Click circle → instantly show as done (or open). Server confirms in background. If server fails, revert + show error toast.
+
+---
+
+## 5. Edit gate (CRITICAL UX rule)
+
+Every entity detail screen has a **Uredi** button. Before clicking it:
+- All fields are read-only
+- No mic button available
+- Action buttons (Briši, Zaključi, etc.) are visible
+
+After clicking Uredi:
+- Fields become editable inputs
+- Uredi button text changes to **Shrani**
+- Cancel link appears
+- **Voice mic is NOT shown** — voice is for adding only, per spec
+
+After Shrani:
+- Server action updates record
+- Return to read-only mode
+- Toast "Spremembe shranjene"
+
+**Implementation**: Single page with `useState` boolean `isEditing`. Show different field types based on state.
+
+---
+
+## 6. File attachment upload
+
+**Trigger**: "+ dodaj" in Dokumenti section of task or project detail (only in edit mode).
+
+**Flow**:
+```ts
+// Client-side
+async function uploadAttachment(file: File, entityType: 'task'|'project', entityId: string) {
+  let processed: File | Blob = file;
+
+  // 1. Compress if image
+  if (file.type.startsWith('image/')) {
+    const { default: imageCompression } = await import('browser-image-compression');
+    processed = await imageCompression(file, {
+      maxSizeMB: 0.3,
+      maxWidthOrHeight: 2400,
+      useWebWorker: true,
+      fileType: 'image/webp',
+    });
+  }
+  // PDFs and other files: upload as-is
+
+  // 2. Upload to Supabase Storage
+  const supabase = createBrowserClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const filename = `${Date.now()}-${file.name.replace(/[^a-z0-9.-]/gi, '_')}`;
+  const path = `${user!.id}/${entityType}/${entityId}/${filename}`;
+
+  const { error } = await supabase.storage
+    .from('attachments')
+    .upload(path, processed, { contentType: processed.type || file.type });
+  if (error) throw error;
+
+  // 3. Record in DB
+  return supabase.from('attachments').insert({
+    user_id: user!.id,
+    entity_type: entityType,
+    entity_id: entityId,
+    storage_path: path,
+    filename: file.name,        // original for display
+    mime_type: processed.type || file.type,
+    size_bytes: processed.size,
+  });
+}
+```
+
+**Display**: When listing attachments, request signed URLs (1-hour expiry) via Supabase Storage. Don't store public URLs in DB.
+
+```ts
+const { data } = await supabase.storage
+  .from('attachments')
+  .createSignedUrl(attachment.storage_path, 3600);
+```
+
+---
+
+## 7. Client autocomplete (used in task/project creation)
+
+```ts
+// As user types in client field:
+async function searchClients(query: string) {
+  const supabase = createBrowserClient();
+  const { data } = await supabase
+    .from('clients')
+    .select('id, name, phone')
+    .ilike('name', `${query}%`)
+    .limit(8)
+    .order('name');
+  return data || [];
+}
+
+// On select existing → use clientId
+// On "Create new: <typed name>" → insert + use new id
+```
+
+---
+
+## 8. Calendar event spanning (rezervacija multi-day)
+
+For a rezervacija with `start_date = 2026-07-15` and `end_date = 2026-07-18`:
+- Show event dot on **every day** between start and end (inclusive)
+- In day dropdown: show "Fasada — Horvat · cel dan" on each of those days
+- In task detail: show range "15. — 18. jul"
+
+```ts
+function getRezervacijaDays(task) {
+  const days = [];
+  const cur = new Date(task.start_date);
+  const end = new Date(task.end_date);
+  while (cur <= end) {
+    days.push(cur.toISOString().split('T')[0]);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+```
