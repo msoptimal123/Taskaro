@@ -1,6 +1,6 @@
 export type TaskType = 'task' | 'deadline' | 'rezervacija';
-export type TaskStatus = 'pending' | 'done';
-export type ProjectStatus = 'active' | 'reserved' | 'closed';
+export type TaskStatus = 'open' | 'in_progress' | 'done';
+export type ProjectStatus = 'reserved' | 'active' | 'done';
 
 export interface Task {
   id: string;
@@ -17,6 +17,9 @@ export interface Task {
   end_date: string | null;
   status: TaskStatus;
   source_transcript: string | null;
+  completed_at: string | null;
+  reminded: boolean;
+  reminder_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -28,9 +31,13 @@ export interface Project {
   title: string;
   description: string | null;
   location: string | null;
+  obseg: string | null;
+  color: string | null;
   start_date: string | null;
   end_date: string | null;
   status: ProjectStatus;
+  closed_at: string | null;
+  converted_from_task_id: string | null;
   created_at: string;
   updated_at: string;
 }
