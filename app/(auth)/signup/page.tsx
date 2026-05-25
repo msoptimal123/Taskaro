@@ -63,7 +63,7 @@ export default function SignupPage() {
         <form onSubmit={handleSignup} className="flex flex-col gap-3">
           <input
             type="text" value={name} onChange={e => setName(e.target.value)}
-            placeholder="Ime in priimek" required
+            placeholder="Ime" required
             className="w-full bg-white border border-border rounded-2xl px-4 py-3 text-sm outline-none focus:border-accent transition-colors"
           />
           <input
