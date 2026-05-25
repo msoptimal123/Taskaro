@@ -44,7 +44,10 @@ export default async function DashboardPage() {
   const overdueTasks = (overdueTasksRes.data ?? []) as TaskWithClient[];
   const notes = (notesRes.data ?? []) as Note[];
 
-  const firstName = capitalize(user?.email?.split('@')[0] ?? 'Janez');
+  const fullName = user?.user_metadata?.full_name as string | undefined;
+  const firstName = fullName
+    ? capitalize(fullName.split(' ')[0])
+    : capitalize(user?.email?.split('@')[0] ?? '');
 
   return (
     <div className="px-5 py-6 pb-32 flex flex-col gap-8">

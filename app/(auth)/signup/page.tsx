@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 export default function SignupPage() {
   const supabase = createBrowserClient();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,7 +16,11 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name.trim() } },
+    });
     setLoading(false);
     if (error) { setError(error.message); return; }
     // If session is set immediately, email confirmation is disabled — redirect
@@ -56,6 +61,11 @@ export default function SignupPage() {
         <p className="text-muted text-sm mb-8">Ustvari račun</p>
 
         <form onSubmit={handleSignup} className="flex flex-col gap-3">
+          <input
+            type="text" value={name} onChange={e => setName(e.target.value)}
+            placeholder="Ime in priimek" required
+            className="w-full bg-white border border-border rounded-2xl px-4 py-3 text-sm outline-none focus:border-accent transition-colors"
+          />
           <input
             type="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="E-pošta" required
