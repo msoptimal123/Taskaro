@@ -1,30 +1,53 @@
 'use client';
 import { useState } from 'react';
 import { createBrowserClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function SignupPage() {
-  const router = useRouter();
   const supabase = createBrowserClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) { setError(error.message); setLoading(false); return; }
-    router.push('/');
-    router.refresh();
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    setLoading(false);
+    if (error) { setError(error.message); return; }
+    // If session is set immediately, email confirmation is disabled — redirect
+    if (data.session) {
+      window.location.href = '/';
+      return;
+    }
+    // Otherwise email confirmation is required
+    setDone(true);
   };
+
+  if (done) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-5">
+        <div className="w-full max-w-sm text-center flex flex-col gap-4">
+          <div className="w-16 h-16 rounded-full bg-border2 flex items-center justify-center mx-auto">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <path d="M4 14l7 7L24 7" stroke="#C2692A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h1 className="font-serif text-3xl tracking-tighter">Preverite e-pošto</h1>
+          <p className="text-muted text-sm leading-relaxed">
+            Poslali smo potrditveno sporočilo na <strong className="text-text">{email}</strong>.<br/>
+            Kliknite na povezavo v e-pošti da aktivirate račun.
+          </p>
+          <Link href="/login" className="text-accent text-sm font-medium">
+            Nazaj na vpis
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-5">
