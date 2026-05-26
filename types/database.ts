@@ -250,15 +250,355 @@ export type Database = {
           },
         ]
       }
+      ai_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          transcript: string | null
+          attachments_count: number
+          context: unknown
+          intents: unknown
+          vision_results: unknown
+          follow_up_questions: unknown
+          status: "processing" | "awaiting_confirmation" | "completed" | "cancelled" | "failed"
+          created_entities: unknown
+          correlation_id: string
+          tokens_input: number
+          tokens_output: number
+          api_cost_cents: number
+          duration_ms: number | null
+          error_message: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          transcript?: string | null
+          attachments_count?: number
+          context?: unknown
+          intents?: unknown
+          vision_results?: unknown
+          follow_up_questions?: unknown
+          status?: "processing" | "awaiting_confirmation" | "completed" | "cancelled" | "failed"
+          created_entities?: unknown
+          correlation_id?: string
+          tokens_input?: number
+          tokens_output?: number
+          api_cost_cents?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          transcript?: string | null
+          status?: "processing" | "awaiting_confirmation" | "completed" | "cancelled" | "failed"
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
+      predlogi: {
+        Row: {
+          id: string
+          user_id: string
+          vir: "voice" | "system"
+          ai_session_id: string | null
+          kategorija: string
+          prioriteta: number
+          entity_type: string
+          entity_id: string
+          naslov: string
+          opis: string | null
+          akcija_label: string
+          akcija_payload: unknown
+          sekundarna_label: string | null
+          sekundarna_payload: unknown
+          status: "aktiven" | "sprejet" | "zavrnjen" | "zastarel"
+          poteče_at: string | null
+          obravnavan_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          vir: "voice" | "system"
+          ai_session_id?: string | null
+          kategorija: string
+          prioriteta?: number
+          entity_type: string
+          entity_id: string
+          naslov: string
+          opis?: string | null
+          akcija_label: string
+          akcija_payload: unknown
+          sekundarna_label?: string | null
+          sekundarna_payload?: unknown
+          status?: "aktiven" | "sprejet" | "zavrnjen" | "zastarel"
+          poteče_at?: string | null
+          obravnavan_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          status?: "aktiven" | "sprejet" | "zavrnjen" | "zastarel"
+          obravnavan_at?: string | null
+        }
+        Relationships: []
+      }
+      ponudbe: {
+        Row: {
+          id: string
+          user_id: string
+          client_id: string
+          project_id: string | null
+          stevilka: string
+          naslov: string | null
+          opomba_zacetna: string | null
+          opomba_koncna: string | null
+          ddv_stopnja: number
+          popust_odstotek: number
+          skupaj_brez_ddv: number
+          ddv_znesek: number
+          skupaj_z_ddv: number
+          veljavna_do: string | null
+          status: "osnutek" | "pripravljena" | "poslana" | "sprejeta" | "zavrnjena" | "preklicana"
+          poslana_at: string | null
+          sprejeta_at: string | null
+          zavrnjena_at: string | null
+          pdf_path: string | null
+          pdf_generated_at: string | null
+          email_subject: string | null
+          email_body: string | null
+          email_sent_to: string | null
+          ai_session_id: string | null
+          ai_context: unknown
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          client_id: string
+          project_id?: string | null
+          stevilka: string
+          naslov?: string | null
+          opomba_zacetna?: string | null
+          opomba_koncna?: string | null
+          ddv_stopnja?: number
+          popust_odstotek?: number
+          skupaj_brez_ddv?: number
+          ddv_znesek?: number
+          skupaj_z_ddv?: number
+          veljavna_do?: string | null
+          status?: "osnutek" | "pripravljena" | "poslana" | "sprejeta" | "zavrnjena" | "preklicana"
+          poslana_at?: string | null
+          sprejeta_at?: string | null
+          zavrnjena_at?: string | null
+          pdf_path?: string | null
+          email_subject?: string | null
+          email_body?: string | null
+          email_sent_to?: string | null
+          ai_session_id?: string | null
+          ai_context?: unknown
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          status?: "osnutek" | "pripravljena" | "poslana" | "sprejeta" | "zavrnjena" | "preklicana"
+          naslov?: string | null
+          opomba_zacetna?: string | null
+          opomba_koncna?: string | null
+          ddv_stopnja?: number
+          veljavna_do?: string | null
+          skupaj_brez_ddv?: number
+          ddv_znesek?: number
+          skupaj_z_ddv?: number
+          pdf_path?: string | null
+          pdf_generated_at?: string | null
+          email_subject?: string | null
+          email_body?: string | null
+          email_sent_to?: string | null
+          poslana_at?: string | null
+          sprejeta_at?: string | null
+          zavrnjena_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ponudba_postavke: {
+        Row: {
+          id: string
+          ponudba_id: string
+          vrstni_red: number
+          naziv: string
+          opis: string | null
+          enota: string | null
+          kolicina: number
+          cena_na_enoto: number
+          skupaj: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ponudba_id: string
+          vrstni_red: number
+          naziv: string
+          opis?: string | null
+          enota?: string | null
+          kolicina: number
+          cena_na_enoto: number
+          skupaj: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          naziv?: string
+          opis?: string | null
+          enota?: string | null
+          kolicina?: number
+          cena_na_enoto?: number
+          skupaj?: number
+        }
+        Relationships: []
+      }
+      company_settings: {
+        Row: {
+          id: string
+          user_id: string
+          naziv: string | null
+          naslov_ulica: string | null
+          naslov_posta: string | null
+          drzava: string | null
+          davcna_stevilka: string | null
+          maticna_stevilka: string | null
+          telefon: string | null
+          email: string | null
+          spletna_stran: string | null
+          iban: string | null
+          bic_swift: string | null
+          banka: string | null
+          logo_path: string | null
+          privzeti_ddv: number
+          privzeta_veljavnost_dni: number
+          privzeta_opomba_zacetna: string | null
+          privzeta_opomba_koncna: string | null
+          gmail_connected_email: string | null
+          gmail_refresh_token_encrypted: string | null
+          gmail_access_token: string | null
+          gmail_token_expires_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          naziv?: string | null
+          naslov_ulica?: string | null
+          naslov_posta?: string | null
+          drzava?: string | null
+          davcna_stevilka?: string | null
+          maticna_stevilka?: string | null
+          telefon?: string | null
+          email?: string | null
+          spletna_stran?: string | null
+          iban?: string | null
+          bic_swift?: string | null
+          banka?: string | null
+          logo_path?: string | null
+          privzeti_ddv?: number
+          privzeta_veljavnost_dni?: number
+          privzeta_opomba_zacetna?: string | null
+          privzeta_opomba_koncna?: string | null
+          gmail_connected_email?: string | null
+          gmail_refresh_token_encrypted?: string | null
+          gmail_access_token?: string | null
+          gmail_token_expires_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          naziv?: string | null
+          naslov_ulica?: string | null
+          naslov_posta?: string | null
+          davcna_stevilka?: string | null
+          maticna_stevilka?: string | null
+          telefon?: string | null
+          email?: string | null
+          spletna_stran?: string | null
+          iban?: string | null
+          bic_swift?: string | null
+          banka?: string | null
+          logo_path?: string | null
+          privzeti_ddv?: number
+          privzeta_veljavnost_dni?: number
+          privzeta_opomba_zacetna?: string | null
+          privzeta_opomba_koncna?: string | null
+          gmail_connected_email?: string | null
+          gmail_refresh_token_encrypted?: string | null
+          gmail_access_token?: string | null
+          gmail_token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_log: {
+        Row: {
+          id: string
+          user_id: string
+          ponudba_id: string | null
+          client_id: string | null
+          to_email: string
+          subject: string
+          body: string
+          attachments_paths: string[] | null
+          status: "sent" | "failed" | "bounced"
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
+          error_message: string | null
+          ai_session_id: string | null
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          ponudba_id?: string | null
+          client_id?: string | null
+          to_email: string
+          subject: string
+          body: string
+          attachments_paths?: string[] | null
+          status: "sent" | "failed" | "bounced"
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          error_message?: string | null
+          ai_session_id?: string | null
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          status?: "sent" | "failed" | "bounced"
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_ponudba_stevilka: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
-      attachment_entity: "task" | "project"
+      attachment_entity: "task" | "project" | "ponudba" | "ai_session"
       project_status: "reserved" | "active" | "done"
       task_status: "open" | "in_progress" | "done"
       task_type: "task" | "deadline" | "rezervacija"

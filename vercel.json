@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate-predlogi",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

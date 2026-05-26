@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { todayISO, formatDateFull } from '@/lib/utils/date';
 import VoiceFab from '@/components/voice/VoiceFab';
 import TaskRow from '@/components/tasks/TaskRow';
+import PredlogiSection from '@/components/predlogi/PredlogiSection';
 import type { Task, Note } from '@/types/domain';
 
 type TaskWithClient = Task & { clients: { name: string } | null };
@@ -62,6 +63,9 @@ export default async function DashboardPage() {
       <div className="flex justify-center">
         <VoiceFab />
       </div>
+
+      {/* Predlogi section */}
+      <PredlogiSection />
 
       {/* Danes section */}
       <section>
