@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/utils/date';
 import type { Task, ProjectStatus } from '@/types/domain';
 import ProjectActions from './ProjectActions';
 import PredlogiSection from '@/components/predlogi/PredlogiSection';
+import PonudbeListSection from '@/components/ponudbe/PonudbeListSection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,6 +222,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* Ponudbe za ta projekt */}
+      <PonudbeListSection projectId={project.id} />
 
       {/* Predlogi for this project */}
       <PredlogiSection entityType="project" entityId={project.id} />

@@ -78,6 +78,73 @@ export async function GET(req: Request) {
     }
   }
 
+  // Rule 3: Upcoming rezervacije (2 days out)
+  const twoDaysFromNow = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0];
+  const { data: upcomingRezervacije } = await supabase
+    .from('tasks')
+    .select('id, user_id, title, start_date')
+    .eq('type', 'rezervacija')
+    .neq('status', 'done')
+    .gte('start_date', today)
+    .lte('start_date', twoDaysFromNow)
+    .not('start_date', 'is', null);
+
+  for (const t of upcomingRezervacije ?? []) {
+    const { data: existing } = await supabase.from('predlogi')
+      .select('id').eq('entity_type', 'task').eq('entity_id', t.id)
+      .eq('kategorija', 'rezervacija_activate').eq('status', 'aktiven').maybeSingle();
+
+    if (!existing) {
+      await supabase.from('predlogi').insert({
+        user_id: t.user_id,
+        vir: 'system',
+        kategorija: 'rezervacija_activate',
+        prioriteta: 8,
+        entity_type: 'task',
+        entity_id: t.id,
+        naslov: `"${t.title}" — čez 2 dni`,
+        opis: `Rezervacija se začne ${t.start_date}. Potrdite aktivacijo?`,
+        akcija_label: 'Potrdi projekt',
+        akcija_payload: { server_action: 'confirmReservation', args: { task_id: t.id } },
+        sekundarna_label: 'Opomni pozneje',
+        sekundarna_payload: null,
+        poteče_at: new Date(Date.now() + 3 * 86400000).toISOString(),
+      });
+    }
+  }
+
+  // Rule 4: Overdue active projects
+  const { data: overdueProjects } = await supabase
+    .from('projects')
+    .select('id, user_id, title, end_date')
+    .eq('status', 'active')
+    .lt('end_date', today)
+    .not('end_date', 'is', null);
+
+  for (const p of overdueProjects ?? []) {
+    const { data: existing } = await supabase.from('predlogi')
+      .select('id').eq('entity_type', 'project').eq('entity_id', p.id)
+      .eq('kategorija', 'project_close').eq('status', 'aktiven').maybeSingle();
+
+    if (!existing) {
+      await supabase.from('predlogi').insert({
+        user_id: p.user_id,
+        vir: 'system',
+        kategorija: 'project_close',
+        prioriteta: 5,
+        entity_type: 'project',
+        entity_id: p.id,
+        naslov: `Projekt "${p.title}" — rok je potekel`,
+        opis: `Rok za projekt je bil ${p.end_date}. Zaključite projekt?`,
+        akcija_label: 'Zaključi projekt',
+        akcija_payload: { server_action: 'closeProject', args: { project_id: p.id } },
+        sekundarna_label: 'Podaljšaj rok',
+        sekundarna_payload: null,
+        poteče_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      });
+    }
+  }
+
   // Cleanup: označi zastarele predloge
   await supabase.from('predlogi').update({ status: 'zastarel' })
     .eq('status', 'aktiven').lt('poteče_at', new Date().toISOString());

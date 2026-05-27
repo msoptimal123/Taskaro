@@ -269,6 +269,15 @@ export async function createFromVoiceMulti(intents: ParsedIntent[], finalText: s
     await supabase.from('tasks').insert(taskRow);
   }
 
+  // Record AI session
+  await db.from('ai_sessions').insert({
+    user_id: user.id,
+    transcript: finalText,
+    intents: intents,
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+  });
+
   revalidatePath('/');
   revalidatePath('/tasks');
 }

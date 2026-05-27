@@ -35,6 +35,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     } else if (p.server_action === 'closeProject') {
       await supabase.from('projects').update({ status: 'done', closed_at: new Date().toISOString() })
         .eq('id', p.args.project_id).eq('user_id', user.id);
+    } else if (p.server_action === 'confirmReservation') {
+      await supabase.from('tasks').update({ type: 'task' })
+        .eq('id', p.args.task_id).eq('user_id', user.id);
     }
   } else if (!accept && payload) {
     const p = payload as { server_action: string; args: Record<string, string> };

@@ -6,6 +6,8 @@ import ClientEditForm from '@/components/clients/ClientEditForm';
 import { formatDate } from '@/lib/utils/date';
 import type { Client, Task, Project } from '@/types/domain';
 import PredlogiSection from '@/components/predlogi/PredlogiSection';
+import PonudbeListSection from '@/components/ponudbe/PonudbeListSection';
+import KorespondenčaSection from '@/components/clients/KorespondenčaSection';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -261,6 +263,12 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
           <p className="text-sm text-muted">Ni projektov za to stranko.</p>
         )}
       </div>
+
+      {/* Ponudbe for this client */}
+      <PonudbeListSection clientId={client.id} />
+
+      {/* Email correspondence */}
+      <KorespondenčaSection clientId={client.id} />
     </div>
   );
 }
