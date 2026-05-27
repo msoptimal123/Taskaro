@@ -72,6 +72,17 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
       });
   }, [finalTranscript]);
 
+  // When recognition ends without producing a final transcript, go back to idle
+  useEffect(() => {
+    if (isListening) return;
+    if (modalState !== 'listening') return;
+    // Give the browser 600ms to fire onFinal — if nothing, reset to idle
+    const timer = setTimeout(() => {
+      setModalState(prev => prev === 'listening' ? 'idle' : prev);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isListening]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Mirror isListening into modalState
   useEffect(() => {
     if (isListening) setModalState('listening');

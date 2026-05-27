@@ -8,10 +8,10 @@ const mainTabs = [
   { href: '/tasks', label: 'Taski', icon: TasksIcon },
   { href: '/calendar', label: 'Kol.', icon: CalendarIcon },
   { href: '/projects', label: 'Projekti', icon: ProjectsIcon },
-  { href: '/ponudbe', label: 'Ponudbe', icon: PonudbeIcon },
 ];
 
 const vecItems = [
+  { href: '/ponudbe', label: 'Ponudbe', icon: PonudbeIcon },
   { href: '/clients', label: 'Stranke', icon: ClientsIcon },
   { href: '/notes', label: 'Beležke', icon: NotesIcon },
   { href: '/settings', label: 'Nastavitve', icon: SettingsIcon },
