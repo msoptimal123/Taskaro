@@ -10,10 +10,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { to, subject, body: emailBody } = await req.json() as {
+  const { to, subject, body: emailBody, rezervacija_start, rezervacija_end, brez_rezervacije } = await req.json() as {
     to: string;
     subject: string;
     body: string;
+    rezervacija_start?: string | null;
+    rezervacija_end?: string | null;
+    brez_rezervacije?: boolean;
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,13 +58,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     pdfFilename: `ponudba-${ponudba.stevilka}.pdf`,
   });
 
-  // Update ponudba status
+  const poslanaAt = new Date().toISOString();
+
+  // Update ponudba status + rezervacija info
   await db.from('ponudbe').update({
     status: 'poslana',
-    poslana_at: new Date().toISOString(),
+    poslana_at: poslanaAt,
     email_sent_to: to,
     email_subject: subject,
     email_body: emailBody,
+    rezervacija_start: brez_rezervacije ? null : (rezervacija_start ?? null),
+    rezervacija_end: brez_rezervacije ? null : (rezervacija_end ?? null),
+    brez_rezervacije: brez_rezervacije ?? false,
   }).eq('id', params.id);
 
   // Log email
@@ -76,6 +84,42 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     gmail_message_id: messageId,
     gmail_thread_id: threadId,
   });
+
+  // Auto-create rezervacija task + deadline (unless brez_rezervacije)
+  if (!brez_rezervacije) {
+    const rezervacijaTitle = `Rezervacija — ${ponudba.stevilka}${ponudba.naslov ? ': ' + ponudba.naslov : ''}`;
+
+    // Create rezervacija task
+    const { data: rezervTask } = await db.from('tasks').insert({
+      user_id: user.id,
+      client_id: ponudba.client_id,
+      type: 'rezervacija',
+      title: rezervacijaTitle,
+      start_date: rezervacija_start ?? null,
+      end_date: rezervacija_end ?? null,
+      status: 'open',
+      ponudba_id: params.id,
+    }).select('id').single();
+
+    if (rezervTask?.id) {
+      // Link rezervacija back to ponudba
+      await db.from('ponudbe').update({ rezervacija_task_id: rezervTask.id }).eq('id', params.id);
+    }
+
+    // Create deadline task (+5 days)
+    const deadlineDate = new Date(poslanaAt);
+    deadlineDate.setDate(deadlineDate.getDate() + 5);
+
+    await db.from('tasks').insert({
+      user_id: user.id,
+      client_id: ponudba.client_id,
+      type: 'deadline',
+      title: `Opomnik ponudba ${ponudba.stevilka}`,
+      due_date: deadlineDate.toISOString().split('T')[0],
+      status: 'open',
+      ponudba_id: params.id,
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

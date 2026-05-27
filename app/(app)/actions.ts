@@ -177,7 +177,20 @@ export async function createFromVoiceMulti(intents: ParsedIntent[], finalText: s
     return created.id;
   }
 
+  // Build lookup: rezervacija intents by client name (to link with ponudba)
+  // Rezervacija from voice is ONLY stored on the ponudba — actual rezervacija task
+  // is auto-created when the ponudba is sent.
+  const rezervacijaByClient: Record<string, ParsedIntent> = {};
   for (const intent of intents) {
+    if (intent.type === 'rezervacija' && intent.client_name) {
+      rezervacijaByClient[intent.client_name.toLowerCase()] = intent;
+    }
+  }
+
+  for (const intent of intents) {
+    // Skip standalone rezervacija intents — linked via ponudba only
+    if (intent.type === 'rezervacija') continue;
+
     if (intent.type === 'note') {
       const noteRow: TablesInsert<'notes'> = {
         text: intent.title,
@@ -191,6 +204,11 @@ export async function createFromVoiceMulti(intents: ParsedIntent[], finalText: s
     const clientId = intent.client_name ? await resolveClient(intent.client_name) : null;
 
     if (intent.type === 'ponudba') {
+      // Check if companion rezervacija intent provides dates
+      const companion = intent.client_name
+        ? rezervacijaByClient[intent.client_name.toLowerCase()]
+        : null;
+
       // Generate quote number and create ponudba with postavke
       const { data: stevilka } = await db.rpc('generate_ponudba_stevilka', { p_user_id: user.id });
       const { data: settings } = await db
@@ -227,6 +245,9 @@ export async function createFromVoiceMulti(intents: ParsedIntent[], finalText: s
           skupaj_z_ddv: skupajZ,
           veljavna_do: veljavnaDo,
           status: 'osnutek',
+          // Store rezervacija dates if companion intent found
+          rezervacija_start: companion?.start_date ?? null,
+          rezervacija_end: companion?.end_date ?? null,
         })
         .select('id')
         .single();

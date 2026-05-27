@@ -40,6 +40,10 @@ type Ponudba = {
   veljavna_do: string | null;
   status: PonudbaStatus;
   created_at: string;
+  rezervacija_start: string | null;
+  rezervacija_end: string | null;
+  brez_rezervacije: boolean;
+  rezervacija_task_id: string | null;
   client: { id: string; name: string; email: string | null; phone: string | null } | null;
   project: { id: string; title: string } | null;
   postavke: Postavka[];
@@ -99,6 +103,9 @@ function SendModal({ ponudba, onClose, onSent }: {
   const [to, setTo] = useState(ponudba.client?.email ?? '');
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
+  const [rezervacijaStart, setRezervacijaStart] = useState(ponudba.rezervacija_start ?? '');
+  const [rezervacijaEnd, setRezervacijaEnd] = useState(ponudba.rezervacija_end ?? '');
+  const [brezRezervacije, setBrezRezervacije] = useState(ponudba.brez_rezervacije ?? false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,7 +117,12 @@ function SendModal({ ponudba, onClose, onSent }: {
       const res = await fetch(`/api/ponudbe/${ponudba.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body }),
+        body: JSON.stringify({
+          to, subject, body,
+          rezervacija_start: brezRezervacije ? null : (rezervacijaStart || null),
+          rezervacija_end: brezRezervacije ? null : (rezervacijaEnd || null),
+          brez_rezervacije: brezRezervacije,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -145,6 +157,40 @@ function SendModal({ ponudba, onClose, onSent }: {
           <label className="text-2xs text-muted font-medium uppercase tracking-wide">Sporočilo:</label>
           <textarea rows={5} value={body} onChange={e => setBody(e.target.value)} className={`${inputCls} resize-none`} />
         </div>
+
+        {/* Rezervacija */}
+        <div className="flex flex-col gap-2 border border-border rounded-2xl p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-2xs text-muted font-medium uppercase tracking-wide">Rezervacija termina</span>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={brezRezervacije} onChange={e => setBrezRezervacije(e.target.checked)} className="w-3.5 h-3.5 accent-accent" />
+              <span className="text-xs text-muted">Brez rezervacije</span>
+            </label>
+          </div>
+          {!brezRezervacije && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={rezervacijaStart}
+                onChange={e => setRezervacijaStart(e.target.value)}
+                className={`flex-1 ${inputCls} py-2`}
+                placeholder="Od"
+              />
+              <span className="text-muted text-sm shrink-0">–</span>
+              <input
+                type="date"
+                value={rezervacijaEnd}
+                onChange={e => setRezervacijaEnd(e.target.value)}
+                className={`flex-1 ${inputCls} py-2`}
+                placeholder="Do"
+              />
+            </div>
+          )}
+          {brezRezervacije && (
+            <p className="text-xs text-muted2">Rezervacija ne bo ustvarjena.</p>
+          )}
+        </div>
+
         <p className="text-xs text-muted">Ponudba bo priložena kot PDF.</p>
         {error && <p className="text-xs text-red-500">{error}</p>}
         <button
