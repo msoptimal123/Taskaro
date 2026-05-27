@@ -5,6 +5,7 @@ import TaskRow from '@/components/tasks/TaskRow';
 import { formatDate } from '@/lib/utils/date';
 import type { Task, ProjectStatus } from '@/types/domain';
 import ProjectActions from './ProjectActions';
+import PredlogiSection from '@/components/predlogi/PredlogiSection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -220,6 +221,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* Predlogi for this project */}
+      <PredlogiSection entityType="project" entityId={project.id} />
 
       {/* Action buttons */}
       <ProjectActions projectId={project.id} status={project.status} />

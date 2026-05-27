@@ -5,6 +5,7 @@ import TypeBadge from '@/components/tasks/TypeBadge';
 import { formatDate, formatDateFull, formatDayName } from '@/lib/utils/date';
 import TaskActions from './TaskActions';
 import type { TaskType, TaskStatus } from '@/types/domain';
+import PredlogiSection from '@/components/predlogi/PredlogiSection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,9 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </span>
         )}
       </div>
+
+      {/* Predlogi for this task */}
+      <PredlogiSection entityType="task" entityId={task.id} limit={2} />
 
       {/* Action buttons */}
       <TaskActions taskId={task.id} status={task.status} />

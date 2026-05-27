@@ -1,7 +1,7 @@
 'use server';
 import { createServerClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import type { ParsedVoice } from '@/types/domain';
+import type { ParsedVoice, ParsedIntent } from '@/types/domain';
 import type { TablesInsert, TablesUpdate } from '@/types/database';
 
 // ─── Task actions ────────────────────────────────────────────────────────────
@@ -137,6 +137,138 @@ export async function createFromVoice(parsed: ParsedVoice, finalText: string) {
   const { error } = await supabase.from('tasks').insert(taskRow);
 
   if (error) throw new Error(error.message);
+  revalidatePath('/');
+  revalidatePath('/tasks');
+}
+
+// ─── Multi-intent voice action ────────────────────────────────────────────────
+
+export async function createFromVoiceMulti(intents: ParsedIntent[], finalText: string) {
+  const supabase = createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  // Cache resolved client IDs by name so we don't create duplicates
+  const clientCache: Record<string, string> = {};
+
+  async function resolveClient(name: string): Promise<string> {
+    if (clientCache[name]) return clientCache[name];
+    const { data: existing } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('user_id', user!.id)
+      .ilike('name', name)
+      .maybeSingle();
+    if (existing) {
+      clientCache[name] = existing.id;
+      return existing.id;
+    }
+    const clientRow: TablesInsert<'clients'> = { name, user_id: user!.id };
+    const { data: created, error } = await supabase
+      .from('clients')
+      .insert(clientRow)
+      .select('id')
+      .single();
+    if (error) throw new Error(error.message);
+    clientCache[name] = created.id;
+    return created.id;
+  }
+
+  for (const intent of intents) {
+    if (intent.type === 'note') {
+      const noteRow: TablesInsert<'notes'> = {
+        text: intent.title,
+        source_transcript: finalText,
+        user_id: user.id,
+      };
+      await supabase.from('notes').insert(noteRow);
+      continue;
+    }
+
+    const clientId = intent.client_name ? await resolveClient(intent.client_name) : null;
+
+    if (intent.type === 'ponudba') {
+      // Generate quote number and create ponudba with postavke
+      const { data: stevilka } = await db.rpc('generate_ponudba_stevilka', { p_user_id: user.id });
+      const { data: settings } = await db
+        .from('company_settings')
+        .select('privzeti_ddv, privzeta_veljavnost_dni, privzeta_opomba_zacetna, privzeta_opomba_koncna')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const ddv = settings?.privzeti_ddv ?? 22;
+      const postavke = intent.ponudba_postavke ?? [];
+      const skupajBrez = postavke.reduce((s, p) => s + (p.kolicina ?? 1) * (p.cena_na_enoto ?? 0), 0);
+      const ddvZnesek = skupajBrez * (ddv / 100);
+      const skupajZ = skupajBrez + ddvZnesek;
+
+      let veljavnaDo: string | null = null;
+      if (settings?.privzeta_veljavnost_dni) {
+        const d = new Date();
+        d.setDate(d.getDate() + settings.privzeta_veljavnost_dni);
+        veljavnaDo = d.toISOString().split('T')[0];
+      }
+
+      const { data: ponudba, error: ponErr } = await db
+        .from('ponudbe')
+        .insert({
+          user_id: user.id,
+          client_id: clientId,
+          stevilka: stevilka ?? `${new Date().getFullYear()}-001`,
+          naslov: intent.title,
+          opomba_zacetna: settings?.privzeta_opomba_zacetna ?? null,
+          opomba_koncna: settings?.privzeta_opomba_koncna ?? null,
+          ddv_stopnja: ddv,
+          skupaj_brez_ddv: skupajBrez,
+          ddv_znesek: ddvZnesek,
+          skupaj_z_ddv: skupajZ,
+          veljavna_do: veljavnaDo,
+          status: 'osnutek',
+        })
+        .select('id')
+        .single();
+
+      if (ponErr) throw new Error(ponErr.message);
+
+      if (postavke.length > 0) {
+        await db.from('ponudba_postavke').insert(
+          postavke.map((p, idx) => ({
+            ponudba_id: ponudba.id,
+            vrstni_red: idx + 1,
+            naziv: p.naziv,
+            enota: p.enota ?? null,
+            kolicina: p.kolicina ?? 1,
+            cena_na_enoto: p.cena_na_enoto ?? 0,
+            skupaj: (p.kolicina ?? 1) * (p.cena_na_enoto ?? 0),
+          }))
+        );
+      }
+
+      revalidatePath('/ponudbe');
+      continue;
+    }
+
+    // task / deadline / rezervacija
+    const taskRow: TablesInsert<'tasks'> = {
+      user_id: user.id,
+      client_id: clientId,
+      type: intent.type as TablesInsert<'tasks'>['type'],
+      title: intent.title,
+      description: intent.description ?? null,
+      location: intent.location ?? null,
+      due_date: intent.due_date ?? null,
+      due_time: intent.due_time ?? null,
+      start_date: intent.start_date ?? null,
+      end_date: intent.end_date ?? null,
+      source_transcript: finalText,
+      status: 'open',
+    };
+    await supabase.from('tasks').insert(taskRow);
+  }
+
   revalidatePath('/');
   revalidatePath('/tasks');
 }

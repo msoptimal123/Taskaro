@@ -5,6 +5,7 @@ import TaskRow from '@/components/tasks/TaskRow';
 import ClientEditForm from '@/components/clients/ClientEditForm';
 import { formatDate } from '@/lib/utils/date';
 import type { Client, Task, Project } from '@/types/domain';
+import PredlogiSection from '@/components/predlogi/PredlogiSection';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -220,6 +221,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
           </div>
         )
       )}
+
+      {/* Predlogi for this client */}
+      <PredlogiSection entityType="client" entityId={client.id} />
 
       {/* Solo tasks */}
       <div className="flex flex-col gap-3">

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useVoiceCapture } from '@/lib/voice/useVoiceCapture';
-import { createFromVoice } from '@/app/(app)/actions';
-import type { ParsedVoice, TaskType } from '@/types/domain';
+import { createFromVoiceMulti } from '@/app/(app)/actions';
+import type { ParsedIntent, TaskType } from '@/types/domain';
 
 interface VoiceModalProps {
   isOpen: boolean;
@@ -12,23 +12,27 @@ interface VoiceModalProps {
 
 type ModalState = 'idle' | 'listening' | 'parsing' | 'review' | 'saving';
 
-const TYPE_COLORS: Record<TaskType | 'note', string> = {
+type IntentType = TaskType | 'note' | 'ponudba';
+
+const TYPE_COLORS: Record<IntentType, string> = {
   task: '#3B82F6',
   deadline: '#D97706',
   rezervacija: '#7C3AED',
   note: '#6B7280',
+  ponudba: '#C2692A',
 };
 
-const TYPE_LABELS: Record<TaskType | 'note', string> = {
+const TYPE_LABELS: Record<IntentType, string> = {
   task: 'Naloga',
   deadline: 'Rok',
   rezervacija: 'Rezervacija',
   note: 'Zapis',
+  ponudba: 'Ponudba',
 };
 
 export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
   const [modalState, setModalState] = useState<ModalState>('idle');
-  const [parsed, setParsed] = useState<ParsedVoice | null>(null);
+  const [intents, setIntents] = useState<ParsedIntent[] | null>(null);
   const [editedTranscript, setEditedTranscript] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -40,7 +44,7 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
     if (!isOpen) {
       reset();
       setModalState('idle');
-      setParsed(null);
+      setIntents(null);
       setEditedTranscript('');
       setSaveError(null);
     }
@@ -58,8 +62,8 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
       body: JSON.stringify({ transcript: finalTranscript }),
     })
       .then((r) => r.json())
-      .then((data: ParsedVoice) => {
-        setParsed(data);
+      .then((data: { intents: ParsedIntent[]; transcript: string }) => {
+        setIntents(data.intents);
         setModalState('review');
       })
       .catch(() => {
@@ -75,7 +79,7 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
 
   const handleStart = useCallback(() => {
     reset();
-    setParsed(null);
+    setIntents(null);
     setSaveError(null);
     setModalState('listening');
     start();
@@ -88,16 +92,16 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
 
   const handleRetry = useCallback(() => {
     reset();
-    setParsed(null);
+    setIntents(null);
     setSaveError(null);
     setModalState('idle');
   }, [reset]);
 
   const handleSave = useCallback(async () => {
-    if (!parsed) return;
+    if (!intents) return;
     setModalState('saving');
     try {
-      await createFromVoice(parsed, editedTranscript);
+      await createFromVoiceMulti(intents, editedTranscript);
       onClose();
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2000);
@@ -105,7 +109,7 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
       setSaveError(err instanceof Error ? err.message : 'Napaka pri shranjevanju');
       setModalState('review');
     }
-  }, [parsed, editedTranscript, onClose]);
+  }, [intents, editedTranscript, onClose]);
 
   const handleOverlayClick = useCallback(() => {
     if (modalState === 'listening') {
@@ -225,7 +229,7 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
             )}
 
             {/* Review state */}
-            {modalState === 'review' && parsed && (
+            {modalState === 'review' && intents && (
               <div className="flex flex-col gap-4">
                 <div>
                   <label className="text-xs text-muted mb-1 block">Prepisano besedilo</label>
@@ -237,43 +241,60 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
                   />
                 </div>
 
-                {/* Parsed chips */}
-                <div className="flex flex-wrap gap-2">
-                  <span
-                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white"
-                    style={{ backgroundColor: TYPE_COLORS[parsed.type] }}
-                  >
-                    {TYPE_LABELS[parsed.type]}
-                  </span>
-                  {parsed.due_date && (
-                    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-border text-muted2">
-                      {parsed.due_date}
-                    </span>
-                  )}
-                  {parsed.start_date && !parsed.due_date && (
-                    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-border text-muted2">
-                      {parsed.start_date}{parsed.end_date ? ` — ${parsed.end_date}` : ''}
-                    </span>
-                  )}
-                  {parsed.client_name && (
-                    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-border text-muted2">
-                      {parsed.client_name}
-                    </span>
-                  )}
-                  {parsed.location && (
-                    <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-border text-muted2">
-                      {parsed.location}
-                    </span>
-                  )}
-                </div>
-
-                {/* Parsed title preview */}
-                <div className="bg-border2 rounded-2xl p-4">
-                  <p className="text-xs text-muted mb-0.5">Naslov</p>
-                  <p className="text-sm font-semibold text-text">{parsed.title}</p>
-                  {parsed.description && (
-                    <p className="text-xs text-muted2 mt-1">{parsed.description}</p>
-                  )}
+                {/* Intent list */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted">
+                    Zaznano
+                    {intents.length > 1 && (
+                      <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent text-white text-2xs font-semibold">
+                        {intents.length}
+                      </span>
+                    )}
+                  </p>
+                  {intents.map((intent, i) => {
+                    const color = TYPE_COLORS[intent.type as IntentType] ?? '#6B7280';
+                    const label = TYPE_LABELS[intent.type as IntentType] ?? intent.type;
+                    return (
+                      <div key={i} className="bg-border2 rounded-2xl p-3 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white shrink-0"
+                            style={{ backgroundColor: color }}
+                          >
+                            {label}
+                          </span>
+                          <p className="text-sm font-semibold text-text truncate">{intent.title}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {intent.due_date && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-border text-muted2">
+                              {intent.due_date}
+                            </span>
+                          )}
+                          {intent.start_date && !intent.due_date && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-border text-muted2">
+                              {intent.start_date}{intent.end_date ? ` — ${intent.end_date}` : ''}
+                            </span>
+                          )}
+                          {intent.client_name && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-border text-muted2">
+                              {intent.client_name}
+                            </span>
+                          )}
+                          {intent.location && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-border text-muted2">
+                              {intent.location}
+                            </span>
+                          )}
+                          {intent.ponudba_postavke && intent.ponudba_postavke.length > 0 && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-border text-muted2">
+                              {intent.ponudba_postavke.length} postavk
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {saveError && (
@@ -294,7 +315,7 @@ export default function VoiceModal({ isOpen, onClose }: VoiceModalProps) {
                     onClick={handleSave}
                     className="flex-1 py-3 rounded-2xl bg-text text-white text-sm font-medium"
                   >
-                    Shrani
+                    Shrani{intents.length > 1 ? ` (${intents.length})` : ''}
                   </button>
                 </div>
               </div>

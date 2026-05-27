@@ -494,7 +494,19 @@ export default function SettingsPage() {
               <p className="text-sm font-semibold text-text">Povezan</p>
               <p className="text-xs text-muted mt-0.5">{gmailEmail}</p>
             </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">Aktiven</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">Aktiven</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch('/api/auth/gmail/disconnect', { method: 'POST' });
+                  setGmailEmail(null);
+                }}
+                className="text-xs text-red-500 font-medium px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Odklopi
+              </button>
+            </div>
           </>
         ) : (
           <>

@@ -1,4 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AnyText = Text as any;
 
 const ACCENT = '#C2692A';
 const LIGHT_BG = '#F5F3EF';
@@ -231,6 +233,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     color: '#333333',
   },
+  footerPageNumber: {
+    fontSize: 7.5,
+    color: MUTED,
+    textAlign: 'right',
+    marginTop: 4,
+  },
 });
 
 function formatCurrency(amount: number): string {
@@ -445,6 +453,12 @@ export default function PonudbaPDF({ ponudba, postavke, client, company }: Ponud
               )}
             </View>
           )}
+          <AnyText
+            style={styles.footerPageNumber}
+            render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+              `${pageNumber} / ${totalPages}`
+            }
+          />
         </View>
 
       </Page>

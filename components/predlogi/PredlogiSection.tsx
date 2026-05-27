@@ -4,26 +4,37 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import PredlogCard from './PredlogCard';
 import type { Predlog } from '@/types/domain';
 
-export default function PredlogiSection() {
+interface PredlogiSectionProps {
+  entityType?: string;
+  entityId?: string;
+  limit?: number;
+}
+
+export default function PredlogiSection({ entityType, entityId, limit = 5 }: PredlogiSectionProps) {
   const [predlogi, setPredlogi] = useState<Predlog[]>([]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = supabase
         .from('predlogi')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'aktiven')
         .order('prioriteta', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(5)
-        .then(({ data }) => {
-          if (data) setPredlogi(data as Predlog[]);
-        });
+        .limit(limit);
+
+      if (entityType) query = query.eq('entity_type', entityType);
+      if (entityId) query = query.eq('entity_id', entityId);
+
+      query.then(({ data }: { data: Predlog[] | null }) => {
+        if (data) setPredlogi(data);
+      });
     });
-  }, []);
+  }, [entityType, entityId, limit]);
 
   function handleHandled(id: string) {
     setPredlogi(prev => prev.filter(p => p.id !== id));
