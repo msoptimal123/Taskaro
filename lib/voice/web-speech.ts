@@ -15,7 +15,7 @@ export function createWebSpeechRecognizer(opts: {
   const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
   const rec: AnySpeechRecognition = new SR();
   rec.lang = 'sl-SI';
-  rec.continuous = false;
+  rec.continuous = true;
   rec.interimResults = true;
   rec.maxAlternatives = 1;
 

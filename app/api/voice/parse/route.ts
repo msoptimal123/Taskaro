@@ -10,53 +10,48 @@ const PonudbaPostavkaSchema = z.object({
   cena_na_enoto: z.number().optional(),
 });
 
-const IntentSchema = z.object({
-  type: z.enum(['task', 'deadline', 'rezervacija', 'note', 'ponudba']),
+const PonudbaSchema = z.object({
+  detected: z.literal(true),
+  title: z.string().nullable(),
+  postavke: z.array(PonudbaPostavkaSchema),
+});
+
+const FormSchema = z.object({
+  type: z.enum(['task', 'project']),
   title: z.string(),
-  description: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  due_time: z.string().nullable().optional(),
-  start_date: z.string().nullable().optional(),
-  end_date: z.string().nullable().optional(),
-  client_name: z.string().nullable().optional(),
-  ponudba_postavke: z.array(PonudbaPostavkaSchema).optional(),
+  date: z.string().nullable(),
+  date_end: z.string().nullable(),
+  time: z.string().nullable(),
+  client_name: z.string().nullable(),
+  project_name: z.string().nullable(),
+  location: z.string().nullable(),
+  description: z.string().nullable(),
+  ponudba: PonudbaSchema.nullable(),
 });
 
-const ResponseSchema = z.object({
-  intents: z.array(IntentSchema),
-});
-
-const SYSTEM = `Si asistent za slovenskega obrtnika. Iz govora razčleni VSE namere (intente) — en glasovni vnos lahko vsebuje več stvari hkrati.
+const SYSTEM = `Si asistent za slovenskega obrtnika. Iz govora izlušči ENO primarno nalogo ali projekt.
 
 Vrni JSON:
 {
-  "intents": [
-    {
-      "type": "task|deadline|rezervacija|note|ponudba",
-      "title": "kratek naslov",
-      "client_name": "ime stranke ali null",
-      "due_date": "YYYY-MM-DD ali null",
-      "due_time": "HH:MM ali null",
-      "start_date": "YYYY-MM-DD ali null",
-      "end_date": "YYYY-MM-DD ali null",
-      "location": "lokacija ali null",
-      "description": "opis ali null",
-      "ponudba_postavke": [{"naziv":"...", "enota":"m²", "kolicina":18, "cena_na_enoto":25}]
-    }
-  ]
+  "type": "task" ali "project",
+  "title": "kratek naslov (max 60 znakov)",
+  "date": "YYYY-MM-DD ali null",
+  "date_end": "YYYY-MM-DD ali null",
+  "time": "HH:MM ali null",
+  "client_name": "ime stranke ali null",
+  "project_name": "ime projekta ali null",
+  "location": "lokacija ali null",
+  "description": "kratki opis ali null",
+  "ponudba": {"detected": true, "title": "naslov ponudbe ali null", "postavke": [...]} ali null
 }
 
 Pravila:
-- type="task": navadno opravilo
-- type="deadline": rok, datum je kritičen
-- type="rezervacija": rezervacija termina za stranko (ima start_date in end_date)
-- type="note": kratka opomba brez konteksta
-- type="ponudba": ponudba s postavkami in cenami
-- Datumi: danes={TODAY}, format YYYY-MM-DD
-- Čas: format HH:MM (24h)
-- Če govori o eni stranki v več intentih, ponovi client_name pri vsakem
-- SAMO JSON, brez razlage`;
+- type="task": naloga, aktivnost, ogled, sestanek, klicati, naročilo, montaža, popravilo
+- type="project": gradbišče, projekt, objekt, prenova, večje dela za stranko
+- date: rok ali datum izvedbe (danes={TODAY})
+- date_end: samo če je časovni obseg (od-do)
+- Če omeni "ponudba", "cena", "€", "popust" → ponudba.detected=true
+- SAMO JSON brez razlage`;
 
 export async function POST(req: Request) {
   const { transcript } = await req.json();
@@ -75,25 +70,22 @@ export async function POST(req: Request) {
   const json = raw.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
 
   try {
-    const parsed = ResponseSchema.parse(JSON.parse(json));
-    return NextResponse.json({ intents: parsed.intents, transcript });
+    const form = FormSchema.parse(JSON.parse(json));
+    return NextResponse.json({ form, transcript });
   } catch {
-    // Fallback: single task intent from transcript
-    return NextResponse.json({
-      intents: [
-        {
-          type: 'task',
-          title: transcript,
-          description: null,
-          client_name: null,
-          location: null,
-          due_date: null,
-          due_time: null,
-          start_date: null,
-          end_date: null,
-        },
-      ],
-      transcript,
-    });
+    // Fallback: minimal task form from transcript
+    const form = {
+      type: 'task' as const,
+      title: transcript,
+      date: null,
+      date_end: null,
+      time: null,
+      client_name: null,
+      project_name: null,
+      location: null,
+      description: null,
+      ponudba: null,
+    };
+    return NextResponse.json({ form, transcript });
   }
 }

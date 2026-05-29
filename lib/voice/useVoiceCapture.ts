@@ -23,6 +23,7 @@ export function useVoiceCapture(): VoiceCaptureResult {
   const recognizerRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const accumulatedRef = useRef('');
 
   const stopRecognizer = useCallback(() => {
     if (recognizerRef.current) {
@@ -40,15 +41,14 @@ export function useVoiceCapture(): VoiceCaptureResult {
   const start = useCallback(() => {
     setError(null);
     setIsListening(true);
+    accumulatedRef.current = '';
 
     if (isWebSpeechSupported()) {
       const rec = createWebSpeechRecognizer({
         onPartial: (text) => setTranscript(text),
         onFinal: (text) => {
-          setFinalTranscript(text);
-          setTranscript('');
-          setIsListening(false);
-          recognizerRef.current = null;
+          accumulatedRef.current += (accumulatedRef.current ? ' ' : '') + text;
+          setTranscript(accumulatedRef.current);
         },
         onError: (err) => {
           setError(err.message);
@@ -108,7 +108,13 @@ export function useVoiceCapture(): VoiceCaptureResult {
   const stop = useCallback(() => {
     if (isWebSpeechSupported()) {
       stopRecognizer();
-      setIsListening(false);
+      if (accumulatedRef.current) {
+        setFinalTranscript(accumulatedRef.current);
+        setTranscript('');
+        setIsListening(false);
+      } else {
+        setIsListening(false);
+      }
     } else {
       stopMediaRecorder();
       // isListening will be set false in onstop handler
@@ -118,6 +124,7 @@ export function useVoiceCapture(): VoiceCaptureResult {
   const reset = useCallback(() => {
     stopRecognizer();
     stopMediaRecorder();
+    accumulatedRef.current = '';
     setTranscript('');
     setFinalTranscript('');
     setError(null);
